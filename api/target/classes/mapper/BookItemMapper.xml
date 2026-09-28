@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kmbeast.mapper.BookItemMapper">
+
+    <resultMap id="entityMap" type="com.kmbeast.pojo.vo.BookItemVO">
+        <id column="id" property="id"/>
+        <result column="name" property="code"/>
+        <result column="booklist_id" property="booklistId"/>
+        <result column="location" property="location"/>
+        <result column="record" property="record"/>
+        <result column="buy_price" property="buyPrice"/>
+        <result column="buy_date" property="buyDate"/>
+        <result column="status" property="status"/>
+        <!--拓展的书目信息-->
+        <result column="book_cover" property="bookCover"/>
+        <result column="book_name" property="bookName"/>
+        <result column="book_author" property="bookAuthor"/>
+    </resultMap>
+
+    <select id="queryPage" resultMap="entityMap">
+
+        SELECT bi.*,
+        b.cover AS book_cover,
+        b.name AS book_name,
+        b.author AS book_author
+        FROM book_item bi
+        LEFT JOIN booklist b ON b.id = bi.booklist_id
+        <where>
+            <if test="code != null and code != ''">
+                AND bi.code = #{code}
+            </if>
+            <if test="booklistId != null">
+                AND bi.booklist_id = #{booklistId}
+            </if>
+            <if test="status != null">
+                AND bi.status = #{status}
+            </if>
+        </where>
+        <if test="current != null and size != null">
+            LIMIT #{current},#{size}
+        </if>
+
+    </select>
+
+    <select id="queryPageCount" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM book_item bi
+        <where>
+            <if test="code != null and code != ''">
+                AND bi.code = #{code}
+            </if>
+            <if test="booklistId != null">
+                AND bi.booklist_id = #{booklistId}
+            </if>
+            <if test="status != null">
+                AND bi.status = #{status}
+            </if>
+        </where>
+    </select>
+
+</mapper>

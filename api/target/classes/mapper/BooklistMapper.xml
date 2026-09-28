@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kmbeast.mapper.BooklistMapper">
+
+    <!-- BooklistVO的resultMap -->
+    <resultMap id="entityMap" type="com.kmbeast.pojo.vo.BooklistVO">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="isbn" property="isbn"/>
+        <result column="detail" property="detail"/>
+        <result column="author" property="author"/>
+        <result column="publisher" property="publisher"/>
+        <result column="publish_count" property="publishCount"/>
+        <result column="publish_year" property="publishYear"/>
+        <result column="cover" property="cover"/>
+        <result column="create_time" property="createTime"/>
+
+        <!-- 分类信息 -->
+        <collection property="categoryList" column="id"
+                    select="selectCategoriesByBookId" fetchType="eager"/>
+    </resultMap>
+
+    <!-- BooklistDetailVO的resultMap，继承BooklistVO -->
+    <resultMap id="detailEntityMap" type="com.kmbeast.pojo.vo.BooklistDetailVO"
+               extends="entityMap">
+        <!-- 馆藏书目信息 -->
+        <collection property="bookItemVOS" column="id"
+                    select="selectBookItemVOSByBookId" fetchType="eager"/>
+    </resultMap>
+
+    <!-- 分页查询（返回BooklistVO） -->
+    <select id="queryPage" resultMap="entityMap">
+        SELECT b.*
+        FROM booklist b
+        <where>
+            <if test="name != null and name != ''">
+                AND b.name LIKE concat('%',#{name},'%')
+            </if>
+            <if test="author != null and author != ''">
+                AND b.author LIKE concat('%',#{author},'%')
+            </if>
+            <if test="publisher != null and publisher != ''">
+                AND b.publisher = #{publisher}
+            </if>
+            <if test="booklistIds != null and booklistIds.size() > 0">
+                AND b.id IN
+                <foreach collection="booklistIds" separator="," item="booklistId" index="index" close=")" open="(">
+                    #{booklistId}
+                </foreach>
+            </if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND b.id IN
+                (SELECT bc.booklist_id FROM book_category bc WHERE bc.category_id IN
+                <foreach collection="categoryIds" separator="," item="categoryId" index="index" close=")" open="(">
+                    #{categoryId}
+                </foreach>
+                )
+            </if>
+        </where>
+        ORDER BY b.create_time DESC
+        <if test="current != null and size != null">
+            LIMIT #{current},#{size}
+        </if>
+    </select>
+
+    <!-- 详情查询（返回BooklistDetailVO） -->
+    <select id="detail" resultMap="detailEntityMap">
+        SELECT b.*
+        FROM booklist b
+        WHERE b.id = #{id}
+    </select>
+
+    <!-- 查询分类信息 -->
+    <select id="selectCategoriesByBookId" resultType="com.kmbeast.pojo.entity.Category">
+        SELECT c.id, c.name
+        FROM category c
+                 INNER JOIN book_category bc ON c.id = bc.category_id
+        WHERE bc.booklist_id = #{id}
+    </select>
+
+    <!-- 查询馆藏书目信息 -->
+    <select id="selectBookItemVOSByBookId" resultType="com.kmbeast.pojo.vo.BookItemVO">
+        SELECT bi.*,
+               b.cover  AS bookCover,
+               b.name   AS bookName,
+               b.author AS bookAuthor
+        FROM book_item bi
+                 LEFT JOIN booklist b ON b.id = bi.booklist_id
+        WHERE bi.booklist_id = #{id}
+        ORDER BY bi.id DESC
+    </select>
+
+    <select id="queryPageCount" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT b.id)
+        FROM booklist b
+        LEFT JOIN book_category bc ON b.id = bc.booklist_id
+        LEFT JOIN category c ON c.id = bc.category_id
+        <where>
+            <if test="name != null and name != ''">
+                AND b.name LIKE concat('%',#{name},'%')
+            </if>
+            <if test="author != null and author != ''">
+                AND b.author LIKE concat('%',#{author},'%')
+            </if>
+            <if test="publisher != null and publisher != ''">
+                AND b.publisher = #{publisher}
+            </if>
+            <if test="booklistIds != null and booklistIds.size() > 0">
+                AND b.id IN
+                <foreach collection="booklistIds" separator="," item="booklistId" index="index" close=")" open="(">
+                    #{booklistId}
+                </foreach>
+            </if>
+            <if test="categoryIds != null and categoryIds.size() > 0">
+                AND b.id IN
+                (SELECT bc.booklist_id FROM book_category bc WHERE bc.category_id IN
+                <foreach collection="categoryIds" separator="," item="categoryId" index="index" close=")" open="(">
+                    #{categoryId}
+                </foreach>
+                )
+            </if>
+        </where>
+    </select>
+    <select id="launchInfo" resultType="java.time.LocalDateTime">
+        SELECT b.create_time
+        FROM booklist b
+    </select>
+    <select id="getIds" resultType="java.lang.Integer">
+        SELECT id FROM booklist
+    </select>
+
+</mapper>

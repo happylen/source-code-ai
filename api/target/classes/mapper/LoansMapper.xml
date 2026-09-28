@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kmbeast.mapper.LoansMapper">
+
+    <resultMap id="entityMap" type="com.kmbeast.pojo.vo.LoansVO">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="book_item_id" property="bookItemId"/>
+        <result column="status" property="status"/>
+        <result column="lend_date" property="lendDate"/>
+        <result column="plan_return_date" property="planReturnDate"/>
+        <result column="real_return_date" property="realReturnDate"/>
+        <result column="create_time" property="createTime"/>
+
+        <!--额外查询的用户信息-->
+        <result column="username" property="username"/>
+        <result column="avatar" property="avatar"/>
+        <result column="account" property="account"/>
+
+        <!--额外查询的馆藏书目信息-->
+        <result column="code" property="code"/>
+        <result column="book_item_status" property="bookItemStatus"/>
+
+        <!--额外查询的馆藏书目信息-->
+        <result column="booklist_id" property="booklistId"/>
+        <result column="cover" property="cover"/>
+        <result column="booklist_name" property="booklistName"/>
+        <result column="booklist_author" property="booklistAuthor"/>
+        <result column="booklist_detail" property="booklistDetail"/>
+        <result column="booklist_publisher" property="booklistPublisher"/>
+    </resultMap>
+
+    <select id="queryPage" resultMap="entityMap">
+
+        SELECT l.*,
+        u.username,
+        u.avatar,
+        u.account,
+        bi.code,
+        bi.status AS book_item_status,
+        b.cover,
+        b.id AS booklist_id,
+        b.name AS booklist_name,
+        b.author AS booklist_author,
+        b.detail AS booklist_detail,
+        b.publisher AS booklist_publisher
+        FROM loans l
+        LEFT JOIN user u ON u.id = l.user_id
+        LEFT JOIN book_item bi ON bi.id = l.book_item_id
+        LEFT JOIN booklist b ON b.id = bi.booklist_id
+        <where>
+            <if test="userId != null">
+                AND l.user_id = #{userId}
+            </if>
+            <if test="bookItemId != null">
+                AND l.book_item_id = #{bookItemId}
+            </if>
+            <if test="status != null">
+                AND l.status = #{status}
+            </if>
+            <if test="statusList != null and statusList.size()>0">
+                AND l.status IN
+                <foreach collection="statusList" item="status" separator="," open="(" close=")" index="index">
+                    #{status}
+                </foreach>
+            </if>
+            <if test="startTime != null and endTime != null">
+                AND l.create_time BETWEEN #{startTime} AND #{endTime}
+            </if>
+        </where>
+        ORDER BY id DESC
+        <if test="current != null and size != null">
+            LIMIT #{current},#{size}
+        </if>
+
+    </select>
+
+    <select id="queryPageCount" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM loans l
+        <where>
+            <if test="userId != null">
+                AND l.user_id = #{userId}
+            </if>
+            <if test="bookItemId != null">
+                AND l.book_item_id = #{bookItemId}
+            </if>
+            <if test="status != null">
+                AND l.status = #{status}
+            </if>
+            <if test="statusList != null and statusList.size()>0">
+                AND l.status IN
+                <foreach collection="statusList" item="status" separator="," open="(" close=")" index="index">
+                    #{status}
+                </foreach>
+            </if>
+            <if test="startTime != null and endTime != null">
+                AND l.create_time BETWEEN #{startTime} AND #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <select id="queryBooklistLendTop" resultType="com.kmbeast.pojo.vo.BooklistLendTopVO">
+
+        SELECT
+            bl.id AS booklistId,
+            bl.name AS booklistName,
+            COUNT(l.id) AS totalBorrowCount
+        FROM loans l
+                 INNER JOIN book_item bi ON l.book_item_id = bi.id
+                 INNER JOIN booklist bl ON bi.booklist_id = bl.id
+        GROUP BY bl.id  -- 按书目ID分组
+        ORDER BY totalBorrowCount DESC
+        LIMIT #{count}
+
+    </select>
+
+</mapper>

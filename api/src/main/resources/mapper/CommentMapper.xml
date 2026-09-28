@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kmbeast.mapper.CommentMapper">
+
+    <!-- resultMap 用于定义结果集映射 -->
+    <resultMap id="commentParentResultMap" type="com.kmbeast.pojo.vo.CommentParentVO">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="avatar" column="avatar"/>
+        <result property="content" column="content"/>
+        <result property="childTotal" column="childTotal"/>
+        <result property="createTime"
+                column="create_time"
+                javaType="java.time.LocalDateTime"
+                jdbcType="TIMESTAMP"/>
+        <!-- 使用 collection 项目类型来映射一对多关系 -->
+        <collection property="commentChildVOS"
+                    ofType="com.kmbeast.pojo.vo.CommentChildVO"
+                    column="{id=id,userId=user_id_param}"
+                    select="getChildCommentsByParentId"/>
+    </resultMap>
+
+    <!-- 查询父级评论 -->
+    <select id="getParentComments" resultMap="commentParentResultMap">
+        SELECT c.id                                                        AS id,
+               c.content                                                   AS content,
+               c.create_time                                               AS create_time,
+               u.id                                                        AS user_id,
+               u.username,
+               u.avatar,
+               (SELECT COUNT(*) FROM comment cv WHERE cv.parent_id = c.id) AS childTotal,
+               (SELECT COUNT(*)
+                FROM comment_like cl
+                WHERE cl.user_id = #{userId}
+                  AND cl.comment_id = c.id)                                AS upvoteFlag,
+               (SELECT COUNT(*)
+                FROM comment_like cl
+                WHERE cl.comment_id = c.id)                                AS upvoteCount,
+               #{userId}                                                   AS user_id_param
+        FROM comment c
+                 LEFT JOIN user u ON u.id = c.commenter_id
+        WHERE c.content_id = #{contentId}
+          AND c.content_type = #{contentType}
+          AND c.parent_id IS NULL
+        ORDER BY id DESC
+    </select>
+
+    <!-- 根据父级评论ID查询子级评论 -->
+    <select id="getChildCommentsByParentId"
+            resultType="com.kmbeast.pojo.vo.CommentChildVO">
+        SELECT c.id                         AS id,
+               c.content                    AS content,
+               c.create_time                AS createTime,
+               c.parent_id                  AS parentId,
+               u.id                         AS userId,
+               (SELECT COUNT(*)
+                FROM comment_like cl
+                WHERE cl.user_id = #{userId}
+                  AND cl.comment_id = c.id) AS upvoteFlag,
+               (SELECT COUNT(*)
+                FROM comment_like cl
+                WHERE cl.comment_id = c.id) AS upvoteCount,
+               u.username                   AS username,
+               u.avatar                     AS avatar,
+               u1.id                        AS replierId,
+               u1.username                  AS replierName,
+               u1.avatar                    AS replierAvatar
+        FROM comment c
+                 LEFT JOIN user u ON u.id = c.commenter_id
+                 LEFT JOIN user u1 ON u1.id = c.replier_id
+        WHERE c.parent_id = #{id}
+          AND c.parent_id IS NOT NULL
+        ORDER BY id DESC
+    </select>
+
+    <select id="query" resultType="com.kmbeast.pojo.vo.CommentChildVO">
+        SELECT c.id AS id,
+        c.content AS content,
+        c.create_time AS createTime,
+        c.parent_id AS parentId,
+        c.content_type AS contentType,
+        u.id AS userId,
+        u.username AS username,
+        (SELECT COUNT(*) FROM comment_like cl WHERE cl.user_id = #{userId} AND cl.comment_id = c.id) AS
+        upvoteFlag,
+        (SELECT COUNT(*) FROM comment_like cl WHERE cl.comment_id = c.id) AS upvoteCount,
+        u.avatar AS avatar,
+        u1.id AS replier_id,
+        u1.username AS replierName,
+        u1.avatar AS replierAvatar
+        FROM comment c
+        LEFT JOIN user u ON u.id = c.commenter_id
+        LEFT JOIN user u1 ON u1.id = c.replier_id
+        <where>
+            <if test="contentType != null and contentType != ''">
+                AND c.content_type = #{contentType}
+            </if>
+            <if test="content != null and content != ''">
+                AND c.content like concat('%',#{content},'%')
+            </if>
+            <if test="startTime != null and endTime != null">
+                AND c.create_time BETWEEN #{startTime} AND #{endTime}
+            </if>
+        </where>
+        ORDER BY c.create_time DESC
+        <if test="current != null and size != ''">
+            LIMIT #{current},#{size}
+        </if>
+    </select>
+
+    <select id="queryCount" resultType="integer">
+        SELECT COUNT(*)
+        FROM comment c
+        <where>
+            <if test="contentType != null and contentType != ''">
+                AND c.content_type like concat('%',#{contentType},'%')
+            </if>
+            <if test="content != null and content != ''">
+                AND c.content like concat('%',#{content},'%')
+            </if>
+            <if test="startTime != null and endTime != null">
+                AND c.create_time BETWEEN #{startTime} AND #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <!-- 批量删除笔记信息 -->
+    <delete id="batchDelete" parameterType="list">
+        DELETE FROM comment WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <!-- 评论信息新增 -->
+    <insert id="save">
+        INSERT INTO comment(parent_id, commenter_id, replier_id, content_type, content_id, content,
+                            create_time)
+        VALUES (#{parentId}, #{commenterId}, #{replierId}, #{contentType}, #{contentId}, #{content},
+                #{createTime})
+    </insert>
+
+    <!-- 批量查询二级评论信息 -->
+    <select id="selectChildComments" parameterType="list" resultType="Integer">
+        SELECT c.id FROM comment c WHERE c.parentId IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <!-- 查询指定内容的全部评论数目 -->
+    <select id="totalCount" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM comment c
+        WHERE c.content_id = #{contentId}
+          AND c.content_type = #{contentType}
+    </select>
+
+</mapper>

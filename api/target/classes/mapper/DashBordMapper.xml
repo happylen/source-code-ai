@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kmbeast.mapper.DashBordMapper">
+
+    <select id="staticValueCount" resultType="com.kmbeast.pojo.vo.ChartsVO">
+        SELECT
+            '用户数（人）' AS name,
+            COUNT(*) AS value
+        FROM user
+        UNION ALL
+        SELECT
+            '公告数（篇）' AS name,
+            COUNT(*) AS value
+        FROM notice
+        UNION ALL
+        SELECT
+            '评论数（条）' AS name,
+            COUNT(*) AS value
+        FROM comment
+        UNION ALL
+        SELECT
+            '图书类别（种）' AS name,
+            COUNT(*) AS value
+        FROM category
+        UNION ALL
+        SELECT
+            '书目（本）' AS name,
+            COUNT(*) AS value
+        FROM booklist
+        UNION ALL
+        SELECT
+            '馆藏书（本）' AS name,
+            COUNT(*) AS value
+        FROM book_item
+        ORDER BY name
+    </select>
+
+    <select id="borrowImpact" resultType="com.kmbeast.pojo.vo.ChartsVO">
+        SELECT '借出数量（本）' AS name,
+               COUNT(*) AS value
+        FROM loans
+        WHERE status IN (1, 2)
+        UNION ALL
+        SELECT '馆藏总量（本）' AS name,
+               COUNT(*) AS value
+        FROM book_item
+        UNION ALL
+        SELECT '可用馆藏（本）' AS name,
+               (SELECT COUNT(*) FROM book_item) -
+               (SELECT COUNT(*) FROM loans WHERE status IN (1, 2)) AS value
+        UNION ALL
+        SELECT '借阅影响率（%）' AS name,
+               ROUND(
+                   IFNULL(
+                       (SELECT COUNT(*) FROM loans WHERE status IN (1, 2)) * 100.0 /
+                       NULLIF((SELECT COUNT(*) FROM book_item), 0),
+                       0
+                   ), 1
+               ) AS value
+    </select>
+
+</mapper>

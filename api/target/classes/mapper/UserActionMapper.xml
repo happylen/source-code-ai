@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.kmbeast.mapper.UserActionMapper">
+
+    <resultMap id="entityMap" type="com.kmbeast.pojo.entity.UserAction">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="booklist_id" property="booklistId"/>
+        <result column="type" property="type"/>
+        <result column="stay_time" property="stayTime"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="queryPage" resultMap="entityMap">
+
+        SELECT ua.id,
+        ua.user_id,
+        ua.booklist_id,
+        ua.type,
+        ua.stay_time,
+        ua.create_time
+        FROM user_action ua
+        <where>
+            <if test="userId != null">
+                AND ua.user_id = #{userId}
+            </if>
+            <if test="booklistId != null">
+                AND ua.booklist_id = #{booklistId}
+            </if>
+            <if test="type != null">
+                AND ua.type = #{type}
+            </if>
+        </where>
+        <if test="current != null and size != null">
+            LIMIT #{current},#{size}
+        </if>
+
+    </select>
+
+    <select id="queryPageCount" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM user_action ua
+        <where>
+            <if test="userId != null">
+                AND ua.user_id = #{userId}
+            </if>
+            <if test="booklistId != null">
+                AND ua.booklist_id = #{booklistId}
+            </if>
+            <if test="type != null">
+                AND ua.type = #{type}
+            </if>
+        </where>
+    </select>
+    <select id="scoreList" resultType="com.kmbeast.pojo.vo.ScoreVO">
+        SELECT
+        user_id AS userId,
+        booklist_id,
+        LEAST(5, -- 评分上限为5分
+        (total_views * 0.35 + total_collects * 0.65 + -- 权重系数减半
+        CASE
+        WHEN total_duration &lt; 6000 THEN 0
+        WHEN total_duration &lt; 20000 THEN 0.5 -- 分值减半
+        WHEN total_duration &lt; 60000 THEN 1 -- 分值减半
+        ELSE 1.5 -- 分值减半
+        END
+        ) / GREATEST(1, (total_views + total_collects)) * 5 -- 调整分母为5
+        ) AS score
+        FROM (
+        SELECT
+        user_id,
+        booklist_id,
+        SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END) AS total_views, -- 2-点击
+        SUM(CASE WHEN type = 1 THEN 1 ELSE 0 END) AS total_collects, -- 1-收藏
+        SUM(CASE WHEN type = 4 THEN stay_time ELSE 0 END) AS total_duration -- 4-停留时长
+        FROM user_action
+        WHERE type IN (1, 2, 4) -- 类型：1-收藏；2-点击；4-停留时长
+        GROUP BY user_id, booklist_id
+        HAVING total_views > 0 OR total_collects > 0
+        ) AS aggregated_data
+        ORDER BY score DESC;
+    </select>
+
+</mapper>
